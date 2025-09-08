@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Flask</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .chat-container {
+            width: 400px;
+            height: 600px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            background: #4a5568;
+            color: white;
+            padding: 20px;
+            border-radius: 15px 15px 0 0;
+            text-align: center;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .user-message {
+            background: #4299e1;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .bot-message {
+            background: #e2e8f0;
+            color: #2d3748;
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+        }
+        
+        .chat-input {
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 25px;
+            outline: none;
+        }
+        
+        .chat-input button {
+            padding: 12px 20px;
+            background: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .chat-input button:hover {
+            background: #3182ce;
+        }
+        
+        .clear-btn {
+            background: #e53e3e !important;
+            margin-left: 10px;
+        }
+        
+        .clear-btn:hover {
+            background: #c53030 !important;
+        }
+        
+        .timestamp {
+            font-size: 0.7em;
+            opacity: 0.6;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>🤖 Chatbot Flask</h2>
+            <p>Conectado a MySQL</p>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot-message">
+                ¡Hola! Soy un chatbot. ¿En qué puedo ayudarte?
+                <div class="timestamp">Ahora</div>
+            </div>
+        </div>
+        
+        <div class="chat-input">
+            <input type="text" id="userInput" placeholder="Escribe tu mensaje..." autocomplete="off">
+            <button onclick="sendMessage()">Enviar</button>
+            <button class="clear-btn" onclick="clearChat()">Limpiar</button>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chatMessages');
+        const userInput = document.getElementById('userInput');
+        
+        // Cargar historial al iniciar
+        window.addEventListener('load', loadChatHistory);
+        
+        function loadChatHistory() {
+            fetch('/chat_history')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.messages && data.messages.length > 0) {
+                        chatMessages.innerHTML = '';
+                        data.messages.forEach(msg => {
+                            addMessageToChat(msg.message_text, msg.message_type, msg.timestamp);
+                        });
+                    }
+                });
+        }
+        
+        function addMessageToChat(message, type, timestamp = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            
+            const time = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+            
+            messageDiv.innerHTML = `
+                ${message}
+                <div class="timestamp">${time}</div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+            
+            // Agregar mensaje del usuario al chat
+            addMessageToChat(message, 'user');
+            userInput.value = '';
+            
+            // Enviar mensaje al servidor
+            fetch('/send_message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.response) {
+                    addMessageToChat(data.response, 'bot');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                addMessageToChat('Lo siento, hubo un error al procesar tu mensaje.', 'bot');
+            });
+        }
+        
+        function clearChat() {
+            fetch('/clear_chat', {
+                method: 'POST'
+            })
+            .then(() => {
+                chatMessages.innerHTML = '';
+                addMessageToChat('¡Chat limpiado! ¿En qué puedo ayudarte?', 'bot');
+            });
+        }
+        
+        // Permitir enviar con Enter
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
